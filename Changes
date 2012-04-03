@@ -1,5 +1,8 @@
 Revision history for Class-Monkey
 
+0.002   03-04-2012
+        You can now pass instances to all hooks. So instead of using a constant to modify an entire class, simply pass it an instance instead and it will modify only that.
+
 0.001   02-04-2012
         First version, released on an unsuspecting world.
 

@@ -3,7 +3,7 @@ package Class::Monkey;
 use strict;
 use warnings;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -149,6 +149,7 @@ sub _doh {
 sub _check_init {
     my $class = shift;
 
+    $class = ref($class) if ref($class);
     _doh "No class was specified" if ! $class;
 
     _doh "Not allowed to patch $class"
@@ -228,6 +229,8 @@ sub has {
 
 =head2 instance
 
+B<Note> This method should be deprecated as all modifiers now support constants OR an instance. Class::Monkey will determine which method should be used, so calling C<instance> is no longer required.
+
 Patch an instance method instead of an entire class
 
     # Pig.pm
@@ -248,12 +251,24 @@ Patch an instance method instead of an entire class
 
     # only $pig2 will have its says method overridden
 
+As of 0.002 you can now do it like this
+
+    override 'says' => sub {
+        print "Meow\n";
+    }, $pig2;
+
+    before 'says' => sub {
+        print "Going to speak\n";
+    }, $pig;
+
+etc..
+
 =cut
 
 sub instance {
     my($method, $code, $instance) = @_;
     $Class::Monkey::Iter++;
-    my $package = ref($instance) . '::Class::Monkey' . $Class::Monkey::Iter;
+    my $package = ref($instance) . '::Class::Monkey::' . $Class::Monkey::Iter;
     no strict 'refs';
     @{$package . '::ISA'} = (ref($instance));
     *{$package . '::' . $method} = $code;
@@ -314,7 +329,16 @@ sub override {
     _add_to_subs("$class\::$method");
     no strict 'refs';
     *$method = sub { $code->(@_) };
-    *{$class . "::$method"} = \*$method;
+    if (ref($class)) {
+        $Class::Monkey::Iter++;
+        my $package = ref($class) . '::Class::Monkey::' . $Class::Monkey::Iter;
+        @{$package . '::ISA'} = (ref($class));
+        *{"${package}::${method}"} = \*$method;
+        bless $_[2], $package;
+    }
+    else {
+        *{$class . "::$method"} = \*$method;
+    }
 }
 
 =head2 method
@@ -373,47 +397,41 @@ Simply adds code to the target method before the original code is ran
 
 sub before {
     my ($method, $code, $class) = @_;
-    
+    my $full; 
     _check_init($class);
-    my $full;
-    if (ref($method) eq 'ARRAY') {
-        for my $subname (@$method) {
-            $full = "$class\::$subname";
-            my $alter_sub;
-            my $new_code;
-            my $old_code;
-            die "Could not find $subname in the hierarchy for $class\n"
-                if ! $class->can($subname);
+    $full = ref($class) ? ref($class) . "::${method}" : "${class}::${method}";
+    my $new_code;
+    my $old_code;
+    die "Could not find $method in the hierarchy for $class\n"
+        if ! $class->can($method);
+    
+    no strict 'refs';
 
-            $old_code = \&{$full};
-            no strict 'refs';
-            *$subname = sub {
-                $code->(@_);
-                $old_code->(@_);
-            };
+    _add_to_subs($full);
+    $old_code = \&{$full};
+    if (ref($class)) {
+        $Class::Monkey::Iter++;
+        my $package = ref($class) . '::Class::Monkey::' . $Class::Monkey::Iter;
+        @{$package . '::ISA'} = (ref($class));
+        $full = "${package}::${method}";
 
-            _add_to_subs($full);
-            *{$full} = \*$subname;
-        }
-    }
-    else {
-        $full = "$class\::$method";
-        my $alter_sub;
-        my $new_code;
-        my $old_code;
-        die "Could not find $method in the hierarchy for $class\n"
-            if ! $class->can($method);
-
-        $old_code = \&{$full};
-        no strict 'refs';
         *$method = sub {
             $code->(@_);
             $old_code->(@_);
         };
-
-        _add_to_subs($full);
+        
+        *{$full} = \*$method;
+        bless $_[2], $package;
+    }
+    else {
+        *$method = sub {
+            $code->(@_);
+            $old_code->(@_);
+        }; 
         *{$full} = \*$method;
     }
+    
+    
 }
 
 =head2 after
@@ -426,8 +444,7 @@ sub after {
     my ($method, $code, $class) = @_;
 
     _check_init($class);
-    my $full = "$class\::$method";
-    my $alter_sub;
+    my $full = ref($class) ? ref($class) . "::${method}" : "${class}::${method}"; 
     my $new_code;
     my $old_code;
     die "Could not find $method in the hierarchy for $class\n"
@@ -435,13 +452,29 @@ sub after {
 
     $old_code = \&{$full};
     no strict 'refs';
-    *$method = sub {
-        $old_code->(@_);
-        $code->(@_);
-    };
+     _add_to_subs($full);
+    if (ref($class)) {
+        $Class::Monkey::Iter++;
+        my $package = ref($class) . '::Class::Monkey::' . $Class::Monkey::Iter;
+        @{$package . '::ISA'} = (ref($class));
+        $full = "${package}::${method}";
 
-    _add_to_subs($full);
-    *{$full} = \*$method;
+        *$method = sub {
+            $old_code->(@_);
+            $code->(@_);
+        };
+
+        *{$full} = \*$method;
+        bless $_[2], $package;
+    }
+    else {
+        *$method = sub {
+            $old_code->(@_);
+            $code->(@_);
+        };
+
+        *{$full} = \*$method;
+    }
 }
 
 =head2 around
@@ -488,7 +521,16 @@ sub around {
     };
 
     _add_to_subs($full);
-    *{$full} = \*$method;
+    if (ref($class)) {
+        $Class::Monkey::Iter++;
+        my $package = ref($class) . '::Class::Monkey::' . $Class::Monkey::Iter;
+        @{$package . '::ISA'} = (ref($class));
+        *{"${package}::${method}"} = \*$method;
+        bless $_[2], $package;
+    }
+    else {
+        *{$full} = \*$method;
+    }
 }
 
 =head2 unpatch
