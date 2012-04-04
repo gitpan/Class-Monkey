@@ -3,7 +3,7 @@ package Class::Monkey;
 use strict;
 use warnings;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -100,7 +100,8 @@ sub import {
             unpatch
             instance
             original
-            has 
+            has
+            extends
         /
     );
 }
@@ -170,6 +171,27 @@ sub getscope {
     my $self = shift;
     my $pkg = $self||scalar caller;
     return $pkg;
+}
+
+=head2 extends
+
+Sometimes you might not want to include the module you want to patch when you C<use Class::Monkey>. No problem. You can use C<extends> to do it later on.
+
+  use Class::Monkey;
+  extends 'SomeClass';
+  extends qw<SomeClass FooClass>;
+
+=cut
+
+sub extends {
+    my (@args) = @_;
+    my $pkg = getscope; 
+    if (scalar @args > 0) {
+        for my $m (@args) {
+            push @{$Class::Monkey::CanPatch}, $m;
+        }
+        _extend_class(\@args, $pkg);
+    }
 }
 
 =head2 has
