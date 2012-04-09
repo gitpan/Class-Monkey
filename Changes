@@ -1,5 +1,8 @@
 Revision history for Class-Monkey
 
+0.004   09-04-2012
+        Added 'exports' method to export an existing subroutine to a patched class or instance.
+
 0.003   04-04-2012
         Removed pod tests that were failing
 

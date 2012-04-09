@@ -3,7 +3,7 @@ package Class::Monkey;
 use strict;
 use warnings;
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -102,6 +102,7 @@ sub import {
             original
             has
             extends
+            exports
         /
     );
 }
@@ -173,6 +174,48 @@ sub getscope {
     return $pkg;
 }
 
+=head2 exports
+
+Have a subroutine in your file you want to explort to your patched class? Use C<exports> to do so.
+
+    package Foo;
+
+    sub new { return bless {}, __PACKAGE__ }    
+
+    1;
+
+    # test.pl
+    package MyPatcher;
+
+    use Class::Monkey qw<Foo>;
+    
+    sub foo { print "Hiya\n"; }
+
+    exports 'foo', qw<Foo>;
+    my $foo = Foo->new;
+    $foo->foo(); # prints Hiya
+    
+    exports 'foo', $foo;        # works with instances too
+
+=cut
+
+sub exports {
+    my ($method, $class) = @_;
+    my $pkg = caller;
+    no strict 'refs';
+    if (ref($class)) {
+        $Class::Monkey::Iter++;
+        my $package = ref($class) . '::Class::Monkey::' . $Class::Monkey::Iter;
+        @{$package . '::ISA'} = (ref($class));
+        *{"${package}::${method}"} = *{"${pkg}::${method}"};
+        bless $_[1], $package;
+    }
+    else {
+        *{"${class}::${method}"} = *{"${pkg}::${method}"};
+    }
+}
+
+    
 =head2 extends
 
 Sometimes you might not want to include the module you want to patch when you C<use Class::Monkey>. No problem. You can use C<extends> to do it later on.
