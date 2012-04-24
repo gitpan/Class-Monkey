@@ -2,8 +2,9 @@ package Class::Monkey;
 
 use strict;
 use warnings;
+no warnings 'redefine';
 
-our $VERSION = '0.004';
+our $VERSION = '0.005';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -81,8 +82,15 @@ Simply import the classes you want to patch as an array when you C<use Class::Mo
 sub import {
     my ($class, @args) = @_;
     my $pkg = scalar caller;
+    my $tweak = 0;
     if (scalar @args > 0) {
         for my $m (@args) {
+            if ($m eq '-tweak') {
+                $tweak = 1;
+                my ($index) = grep { $args[$_] eq '-tweak' } 0..$#args;
+                splice @args, $index, 1;
+                next;
+            }
             push @{$Class::Monkey::CanPatch}, $m;
         }
         _extend_class(\@args, $pkg);
@@ -104,12 +112,15 @@ sub import {
             extends
             exports
         /
-    );
+    ) unless $tweak;
+
+    _import_def($pkg, undef, qw<tweak haz>) if $tweak;
 }
 
 sub _extend_class {
     my ($mothers, $class) = @_;
 
+    return if $class eq __PACKAGE__;
     foreach my $mother (@$mothers) {
         # if class is unknown to us, import it (FIXME)
         unless (grep { $_ eq $mother } @$Class::Monkey::Classes) {
@@ -119,12 +130,65 @@ sub _extend_class {
 
             $mother->import;
         }
-        push @$Class::Monkey::Classes, $class;
+        push @$Class::Monkey::Classes, $mother;
     }
 
     {
         no strict 'refs';
         @{"${class}::ISA"} = @$mothers;
+    }
+}
+
+=head2 haz
+
+Please see C<tweak> for more information on how to get this method. C<haz> behaves the exact same way as C<extends>.
+
+    use Class::Monkey '-tweak';
+
+    haz 'FooClass';
+    haz qw<FooClass Another::FooClass More::FooClass>;
+
+=cut
+
+sub haz {
+    my (@args) = @_;
+    my $pkg = getscope();
+    print "Pushing to $pkg\n";
+    if (scalar @args > 0) {
+        for my $m (@args) {
+            push @{$Class::Monkey::CanPatch}, $m;
+        }
+        _extend_class(\@args, $pkg);
+    }
+}
+
+=head2 tweak
+
+This method is only available when you C<use Class::Monkey '-tweak'>. This option may be preferred over the default modifier methods when you need to patch a class from a script using Moose/Mouse/Moo/Mo, etc. When you add -tweak, it will export only the C<tweak> and C<haz> methods.
+
+    use Class::Monkey '-tweak';
+    haz 'Foo';
+
+    tweak 'mymethod' => (
+        class => 'Foo',
+        override => sub {
+            print "mymethod has been overridden\n";
+        },
+    );
+
+You can replace 'override' in the above example with any of the available Class::Monkey modifiers (ie: before, method, after, around). Also C<class> can be the full name of the class as above, or an instance.
+
+=cut
+    
+sub tweak {
+    my ($sub, %args) = @_;
+    
+    my $class = delete $args{class};
+    {
+        no strict 'refs';
+        foreach my $action (keys %args) {
+            $action->($sub, $args{$action}, $class);
+        }
     }
 }
 
@@ -170,7 +234,7 @@ sub _add_to_subs {
 
 sub getscope {
     my $self = shift;
-    my $pkg = $self||scalar caller;
+    my $pkg = $self||scalar caller(1);
     return $pkg;
 }
 

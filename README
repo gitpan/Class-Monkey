@@ -69,6 +69,35 @@ SYNOPSIS
         $p->needThisMethod;
 
 METHODS
+  haz
+    Please see "tweak" for more information on how to get this method. "haz"
+    behaves the exact same way as "extends".
+
+        use Class::Monkey '-tweak';
+
+        haz 'FooClass';
+        haz qw<FooClass Another::FooClass More::FooClass>;
+
+  tweak
+    This method is only available when you "use Class::Monkey '-tweak'".
+    This option may be preferred over the default modifier methods when you
+    need to patch a class from a script using Moose/Mouse/Moo/Mo, etc. When
+    you add -tweak, it will export only the "tweak" and "haz" methods.
+
+        use Class::Monkey '-tweak';
+        haz 'Foo';
+
+        tweak 'mymethod' => (
+            class => 'Foo',
+            override => sub {
+                print "mymethod has been overridden\n";
+            },
+        );
+
+    You can replace 'override' in the above example with any of the
+    available Class::Monkey modifiers (ie: before, method, after, around).
+    Also "class" can be the full name of the class as above, or an instance.
+
   exports
     Have a subroutine in your file you want to explort to your patched
     class? Use "exports" to do so.

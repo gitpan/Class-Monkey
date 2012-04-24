@@ -1,5 +1,8 @@
 Revision history for Class-Monkey
 
+0.005   24-04-2012
+        Added no warnings 'redefine'. New 'tweak' method created for those who need to use Class::Monkey in Moose-type projects. Using the attribute '-tweak' when you "use" Class::Monkey will ensure it exports only the tweak and 'haz' method (Use 'haz' in place of 'extends').
+
 0.004   09-04-2012
         Added 'exports' method to export an existing subroutine to a patched class or instance.
 
