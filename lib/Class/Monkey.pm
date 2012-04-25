@@ -4,7 +4,7 @@ use strict;
 use warnings;
 no warnings 'redefine';
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -153,7 +153,6 @@ Please see C<tweak> for more information on how to get this method. C<haz> behav
 sub haz {
     my (@args) = @_;
     my $pkg = getscope();
-    print "Pushing to $pkg\n";
     if (scalar @args > 0) {
         for my $m (@args) {
             push @{$Class::Monkey::CanPatch}, $m;
