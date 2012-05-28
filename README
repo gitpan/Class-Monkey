@@ -1,298 +1,55 @@
-NAME
-    Class::Monkey - Monkey Patch a class/instance with modifiers and other
-    sweet stuff
-
-DESCRIPTION
-    Say we have a module installed on the system. It does some handy things,
-    but you find a bug or a strange feature. We can easily fix it without
-    subclassing by the following...
-
-        # StupidClass.pm
-        package SupidClass;
-    
-        sub new {
-            my $class = shift;
-            return bless {}, $class;
-        }
-
-        sub name {
-            my ($self, $name) = @_;
-            print "Hello, ${name}\n";
-        }
-
-        sub no_args {
-            print "No arguments were specified!\n";
-        }
-
-        1;
-
-    Above is our class. A stupid one at that. The "name" method doesn't
-    validate the arguments.. it just tries to print them in a 'hello'
-    string. We can use an "around" method to call the "name" method if
-    arguments are passed, or to call "no_args" if not. We can happily do
-    this from the program.
-
-        # our_program.pl
-        use Class::Monkey qw<StupidClass>;
-
-        # The patch
-        around 'name' => sub {
-            my $method = shift;
-            my $self   = shift;
-        
-            if (@_) {
-                $self->$method(@_);
-            }
-            else {
-                $self->no_args();
-            }
-        },
-        qw<StupidClass>;
-        # /The Patch
-     
-        $s->name();         # actually executes no_args
-        $s->name("World"):  # runs name
-
-SYNOPSIS
-    Simply import the classes you want to patch as an array when you "use
-    Class::Monkey". Doing this means you won't even need to "use" the module
-    you want to patch - Class::Monkey takes care of that for you.
-
-        use Class::Monkey qw<Some::Package Another::Module>;
-
-        method 'needThisMethod' => sub {
-            ...
-        },
-        qw<Some::Package>;
-
-        my $p = Some::Package->new;
-        $p->needThisMethod;
-
-METHODS
-  haz
-    Please see "tweak" for more information on how to get this method. "haz"
-    behaves the exact same way as "extends".
-
-        use Class::Monkey '-tweak';
-
-        haz 'FooClass';
-        haz qw<FooClass Another::FooClass More::FooClass>;
-
-  tweak
-    This method is only available when you "use Class::Monkey '-tweak'".
-    This option may be preferred over the default modifier methods when you
-    need to patch a class from a script using Moose/Mouse/Moo/Mo, etc. When
-    you add -tweak, it will export only the "tweak" and "haz" methods.
-
-        use Class::Monkey '-tweak';
-        haz 'Foo';
-
-        tweak 'mymethod' => (
-            class => 'Foo',
-            override => sub {
-                print "mymethod has been overridden\n";
-            },
-        );
-
-    You can replace 'override' in the above example with any of the
-    available Class::Monkey modifiers (ie: before, method, after, around).
-    Also "class" can be the full name of the class as above, or an instance.
-
-  exports
-    Have a subroutine in your file you want to explort to your patched
-    class? Use "exports" to do so.
-
-        package Foo;
-
-        sub new { return bless {}, __PACKAGE__ }    
+Class-Monkey
 
-        1;
-
-        # test.pl
-        package MyPatcher;
+The README is used to introduce the module and provide instructions on
+how to install the module, any machine dependencies it may have (for
+example C compilers and installed libraries) and any other information
+that should be provided before the module is installed.
 
-        use Class::Monkey qw<Foo>;
-    
-        sub foo { print "Hiya\n"; }
+A README file is required for CPAN modules since CPAN extracts the README
+file from a module distribution so that people browsing the archive
+can use it to get an idea of the module's uses. It is usually a good idea
+to provide version information here so that people can decide whether
+fixes for the module are worth downloading.
 
-        exports 'foo', qw<Foo>;
-        my $foo = Foo->new;
-        $foo->foo(); # prints Hiya
-    
-        exports 'foo', $foo;        # works with instances too
-
-  extends
-    Sometimes you might not want to include the module you want to patch
-    when you "use Class::Monkey". No problem. You can use "extends" to do it
-    later on.
-
-      use Class::Monkey;
-      extends 'SomeClass';
-      extends qw<SomeClass FooClass>;
-
-  has
-    Gives the wanted class an accessor. You can assign it a read-only or
-    read-writable type (Similar to Moose). Because it works on remote
-    packages you need to give it the full name of the method including the
-    class.
-
-        use Class::Monkey qw<Foo::Class>;
-    
-        has 'Foo::Class::greet' => ( is => 'ro', default => 'Hello' ); # read-only
-        has 'Foo::Class::name'  => ( is => 'rw', default => 'World' ); # read-writable
-    
-        my $foo = Foo::Class->new;
-        say "Hello, " . $foo->name;
-    
-        $foo->name('Monkey); # updates the name accessor to return a new value
-
-    If you leave out the "is" parameter when you define an accessor it will
-    always default to read-writable.
-
-  instance
-    Note This method should be deprecated as all modifiers now support
-    constants OR an instance. Class::Monkey will determine which method
-    should be used, so calling "instance" is no longer required.
-
-    Patch an instance method instead of an entire class
-
-        # Pig.pm
-        package Pig;
-        sub new { return bless {}, shift; }
-        sub says { print "Oink!\n"; }
-
-        # test.pl
-        package main;
-        use Class::Monkey qw<Pig>;
-
-        my $pig  = Pig->new;
-        my $pig2 = Pig->new;
-        instance 'says' => sub {
-            print "Meow\n";
-        },
-        $pig2;
-
-        # only $pig2 will have its says method overridden
-
-    As of 0.002 you can now do it like this
-
-        override 'says' => sub {
-            print "Meow\n";
-        }, $pig2;
-
-        before 'says' => sub {
-            print "Going to speak\n";
-        }, $pig;
-
-    etc..
-
-  original
-    If you want to run the original version of a patched method, but not
-    unpatch it right away you can use "original" to do so. It will run the
-    old method before it was patched with any arguments you specify, but the
-    actual method will still remain patched.
-
-        after 'someMethod' => sub {
-            print "Blah\n"
-        },
-        qw<Foo>;
-
-        original('Foo', 'someMethod', qw<these are my args>);
-
-    OR if you prefer, you can just call
-    "Class::Monkey::PatchedClassName::method-"(@args)>
-
-        Class::Monkey::Foo->someMethod('these', 'are', 'my', 'args);
-
-  override
-    Overrides an already existing method. If the target method doesn't exist
-    then Class::Monkey will throw an error.
-
-        override 'foo' => sub {
-            return "foo bar";
-        },
-        qw<Some::Module>;
-
-  method
-    Creates a brand new method in the target module. It will NOT allow you
-    to override an existing one using this, and will throw an error.
-
-        method 'active_customers' => sub {
-            my $self = shift;
-            return $self->search({ status => 'active' });
-        },
-        qw<Schema::ResultSet::Customer>;
-
-  before
-    Simply adds code to the target method before the original code is ran
-
-        # Foo.pm
-        package Foo;
-    
-        sub new { return bless {}, __PACKAGE__; }
-        sub hello { print "Hello, $self->{name}; }
-        1;
-
-        # test.pl
-        use Class::Monkey qw<Foo>;
-   
-        my $foo = Foo->new; 
-        before 'hello' => {
-            my $self = shift;
-            $self->{name} = 'World';
-        },
-        qw<Foo>;
-
-        print $foo->hello . "\n";
-
-  after
-    Basically the same as "before", but appends the code specified to the
-    END of the original
-
-  around
-    Around gives the user a bit more control over the subroutine. When you
-    create an around method the first argument will be the original method,
-    the second is $self and the third is any arguments passed to the
-    original subroutine. In a away this allows you to control the flow of
-    the entire subroutine.
-
-        package MyFoo;
-
-        sub greet {
-            my ($self, $name) = @_;
-
-            print "Hello, $name!\n";
-        }
-
-        1;
-
-        # test.pl
-
-        use Class::Monkey qw<MyFoo>;
-
-        # only call greet if any arguments were passed to MyFoo->greet()
-        around 'greet' => sub {
-            my $method = shift;
-            my $self = shift;
-
-            $self->$method(@_)
-                if @_;
-        },
-        qw<MyFoo>;
-
-  unpatch
-    Undoes any modifications made to patched methods, restoring it to its
-    original state.
-
-        override 'this' => sub {
-            print "Blah\n";
-        }, qw<FooClass>;
-  
-        unpatch 'this', 'FooClass';
-
-AUTHOR
-    Brad Haywood <brad@geeksware.net>
-
-LICENSE
-    You may distribute this code under the same terms as Perl itself.
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+SUPPORT AND DOCUMENTATION
+
+After installing, you can find documentation for this module with the
+perldoc command.
+
+    perldoc Class::Monkey
+
+You can also look for information at:
+
+    RT, CPAN's request tracker (report bugs here)
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Class-Monkey
+
+    AnnoCPAN, Annotated CPAN documentation
+        http://annocpan.org/dist/Class-Monkey
+
+    CPAN Ratings
+        http://cpanratings.perl.org/d/Class-Monkey
+
+    Search CPAN
+        http://search.cpan.org/dist/Class-Monkey/
+
+
+LICENSE AND COPYRIGHT
+
+Copyright (C) 2012 Brad Haywood
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+See http://dev.perl.org/licenses/ for more information.
 

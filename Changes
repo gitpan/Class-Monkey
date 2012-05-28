@@ -1,5 +1,8 @@
 Revision history for Class-Monkey
 
+0.007   28-05-2012
+        It was a bit annoying having to ask Class::Monkey to 'use' a module when I didn't want it to. You can now use canpatch qw<mod1 mod2 ...> to tell Class::Monkey you want to patch these modules, but don't actually use them.
+
 0.006   25-04-2012
         No real changes, but I was naughty and left some stuff in the code I used for debugging.. tsk.
 

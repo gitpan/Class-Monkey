@@ -4,7 +4,7 @@ use strict;
 use warnings;
 no warnings 'redefine';
 
-our $VERSION = '0.006';
+our $VERSION = '0.007';
 $Class::Monkey::Subs     = {};
 $Class::Monkey::CanPatch = [];
 $Class::Monkey::Classes  = [];
@@ -111,6 +111,7 @@ sub import {
             has
             extends
             exports
+            canpatch
         /
     ) unless $tweak;
 
@@ -219,6 +220,25 @@ sub _check_init {
 
     _doh "Not allowed to patch $class"
         if ! grep { $_ eq $class } @{$Class::Monkey::CanPatch};
+}
+
+=head2 canpatch
+
+Tells Class::Monkey you want to be able to patch the specified modules, but not to 'use' them.
+
+    use Class::Monkey;
+    use MyFoo;
+
+    canpatch qw<MyFoo AndThis AndThat>;
+
+    # then do stuff with MyFoo as normal
+
+=cut
+
+sub canpatch {
+    my (@modules) = @_;
+    
+    push @{$Class::Monkey::CanPatch}, @modules;
 }
 
 sub _add_to_subs {
